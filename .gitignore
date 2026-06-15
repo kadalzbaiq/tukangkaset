@@ -1,0 +1,7 @@
+.env
+.env.*
+cookies.txt
+node_modules/
+logs/
+sessions/
+config.json
