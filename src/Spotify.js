@@ -161,7 +161,7 @@ class Spotify {
                 return tracks;
             }
         } catch (error) {
-            console.error(`❌ Spotify Web API playlist fetch failed for ${playlistId}:`, error.statusCode || error.status || '', error.message || error);
+            console.log(`ℹ️ Spotify Web API playlist fetch unavailable for ${playlistId}; using metadata fallback:`, error.statusCode || error.status || '', error.message || error);
         }
 
         return await this.getPlaylistTracksFromUrlInfo(playlistId, guildId);
@@ -229,7 +229,7 @@ class Spotify {
                 return tracks;
             }
         } catch (error) {
-            console.error(`❌ Spotify Web API playlist tracks fetch failed for ${playlistId}:`, error.statusCode || error.status || '', error.message || error);
+            console.log(`ℹ️ Spotify Web API playlist tracks fetch unavailable for ${playlistId}; using metadata fallback:`, error.statusCode || error.status || '', error.message || error);
         }
 
         return await this.getPlaylistTracksFromUrlInfo(playlistId, guildId);
