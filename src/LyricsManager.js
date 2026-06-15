@@ -6,6 +6,7 @@ class LyricsManager {
     constructor() {
         this.cache = new Map(); // Cache lyrics by track URL
         this.cacheTimers = new Map(); // Track cache expiration timers
+        this.providerIssueLogTimestamps = new Map(); // Throttle optional lyrics provider logs
         
         // Initialize Genius client (works without token via web scraping)
         // Token can be added later for higher rate limits: new Genius.Client(token)
@@ -107,6 +108,36 @@ class LyricsManager {
 
 
 
+    getLyricsProviderTimeoutMs(provider = 'LRCLIB') {
+        const envKey = `LYRICS_${provider.toUpperCase()}_TIMEOUT_MS`;
+        const value = Number(process.env[envKey] || process.env.LYRICS_TIMEOUT_MS || 5000);
+
+        if (!Number.isFinite(value) || value <= 0) {
+            return 5000;
+        }
+
+        return value;
+    }
+
+    logLyricsProviderIssue(provider, error) {
+        const message = error?.message || String(error || 'Unknown error');
+        const code = error?.code || error?.response?.status || '';
+        const normalized = `${code} ${message}`.trim();
+
+        const throttleKey = `${provider}:${normalized}`;
+        const now = Date.now();
+        const lastLoggedAt = this.providerIssueLogTimestamps.get(throttleKey) || 0;
+        const throttleMs = 5 * 60 * 1000;
+
+        if (now - lastLoggedAt < throttleMs) {
+            return;
+        }
+
+        this.providerIssueLogTimestamps.set(throttleKey, now);
+
+        console.log(`ℹ️ Lyrics provider ${provider} unavailable; continuing without lyrics:`, normalized);
+    }
+
     async fetchFromLrclib(track) {
         try {
             const artist = track.artist || track.uploader || '';
@@ -129,7 +160,7 @@ class LyricsManager {
                 try {
                     const response = await axios.get(searchUrl, {
                         params,
-                        timeout: 5000
+                        timeout: this.getLyricsProviderTimeoutMs('LRCLIB')
                     });
 
                     if (response.data && response.data.length > 0) {
@@ -144,14 +175,14 @@ class LyricsManager {
                     }
                 } catch (error) {
                     if (i === attempts.length - 1) {
-                        console.error('❌ Failed to fetch lyrics from LRCLIB:', error.message);
+                        this.logLyricsProviderIssue('LRCLIB', error);
                     }
                 }
             }
 
             return null;
         } catch (error) {
-            console.error('❌ Failed to fetch lyrics from LRCLIB:', error.message);
+            this.logLyricsProviderIssue('LRCLIB', error);
             return null;
         }
     }
@@ -182,7 +213,7 @@ class LyricsManager {
                 source: 'Genius'
             });
         } catch (error) {
-            console.error('❌ Failed to fetch lyrics from Genius:', error.message);
+            this.logLyricsProviderIssue('Genius', error);
             return null;
         }
     }
