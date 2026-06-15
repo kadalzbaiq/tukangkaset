@@ -5,3 +5,7 @@ node_modules/
 logs/
 sessions/
 config.json
+audio_cache/
+database/playerState.json
+database/playerState.json.*
+*.bak.*

@@ -1,4 +1,11 @@
 const SpotifyWebApi = require('spotify-web-api-node');
+
+let spotifyUrlInfo = null;
+try {
+    spotifyUrlInfo = require('spotify-url-info')(fetch);
+} catch (error) {
+    spotifyUrlInfo = null;
+}
 const config = require('../config');
 const LanguageManager = require('./LanguageManager');
 
@@ -139,7 +146,9 @@ class Spotify {
             const playlistInfo = await this.spotifyApi.getPlaylist(playlistId);
             const tracks = [];
 
-            for (const item of playlistInfo.body.tracks.items.slice(0, config.bot.maxPlaylistSize)) {
+            const items = playlistInfo.body.tracks?.items || [];
+
+            for (const item of items.slice(0, config.bot.maxPlaylistSize)) {
                 if (item.track && item.track.type === 'track') {
                     const formattedTrack = await this.formatTrack(item.track, guildId);
                     if (formattedTrack) {
@@ -148,10 +157,14 @@ class Spotify {
                 }
             }
 
-            return tracks;
+            if (tracks.length > 0) {
+                return tracks;
+            }
         } catch (error) {
-            return [];
+            console.error(`❌ Spotify Web API playlist fetch failed for ${playlistId}:`, error.statusCode || error.status || '', error.message || error);
         }
+
+        return await this.getPlaylistTracksFromUrlInfo(playlistId, guildId);
     }
 
     static async getArtistTopTracks(artistId, guildId = null) {
@@ -212,8 +225,93 @@ class Spotify {
                 }
             }
 
+            if (tracks.length > 0) {
+                return tracks;
+            }
+        } catch (error) {
+            console.error(`❌ Spotify Web API playlist tracks fetch failed for ${playlistId}:`, error.statusCode || error.status || '', error.message || error);
+        }
+
+        return await this.getPlaylistTracksFromUrlInfo(playlistId, guildId);
+    }
+
+    static async getPlaylistTracksFromUrlInfo(playlistId, guildId = null) {
+        if (!spotifyUrlInfo?.getTracks) {
+            return [];
+        }
+
+        try {
+            const playlistUrl = this.createSpotifyURL('playlist', playlistId);
+            const rawTracks = await spotifyUrlInfo.getTracks(playlistUrl);
+
+            if (!Array.isArray(rawTracks) || rawTracks.length === 0) {
+                return [];
+            }
+
+            const tracks = [];
+
+            for (const item of rawTracks.slice(0, config.bot.maxPlaylistSize)) {
+                const source = item.track || item;
+
+                const title = source.name || source.title || source.track || 'Unknown Title';
+
+                let artists = 'Unknown Artist';
+                if (Array.isArray(source.artists)) {
+                    artists = source.artists
+                        .map(artist => typeof artist === 'string' ? artist : artist?.name)
+                        .filter(Boolean)
+                        .join(', ') || artists;
+                } else if (typeof source.artists === 'string') {
+                    artists = source.artists;
+                } else if (typeof source.artist === 'string') {
+                    artists = source.artist;
+                } else if (typeof source.subtitle === 'string') {
+                    artists = source.subtitle;
+                }
+
+                const durationMs = Number(source.duration_ms || source.durationMs || 0);
+                const trackId = source.id || source.uri?.split(':').pop() || null;
+
+                const spotifyUrl =
+                    source.external_urls?.spotify ||
+                    source.link ||
+                    source.url ||
+                    (trackId ? this.createSpotifyURL('track', trackId) : null);
+
+                const albumName =
+                    source.album?.name ||
+                    (typeof source.album === 'string' ? source.album : null);
+
+                const thumbnail =
+                    source.album?.images?.[0]?.url ||
+                    source.image ||
+                    source.thumbnail ||
+                    null;
+
+                tracks.push({
+                    id: trackId || `${title}-${artists}`,
+                    title,
+                    artist: artists,
+                    album: albumName,
+                    url: spotifyUrl,
+                    spotifyUrl,
+                    duration: durationMs ? Math.floor(durationMs / 1000) : 0,
+                    thumbnail,
+                    platform: 'spotify',
+                    isLive: false,
+                    addedAt: Date.now(),
+                    requesterId: null,
+                    requesterTag: null,
+                    extra: {
+                        source: 'spotify-url-info'
+                    }
+                });
+            }
+
+            console.log(`✅ Spotify playlist ${playlistId} loaded via spotify-url-info fallback: ${tracks.length} track(s)`);
             return tracks;
         } catch (error) {
+            console.error(`❌ spotify-url-info fallback failed for playlist ${playlistId}:`, error.message || error);
             return [];
         }
     }
