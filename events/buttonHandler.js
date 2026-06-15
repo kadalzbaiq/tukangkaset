@@ -1,4 +1,4 @@
-const { Events, EmbedBuilder, ActionRowBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { Events, EmbedBuilder, ActionRowBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ButtonBuilder, ButtonStyle, MessageFlags} = require('discord.js');
 const config = require('../config');
 const LanguageManager = require('../src/LanguageManager');
 const MusicPlayer = require('../src/MusicPlayer');
@@ -1008,7 +1008,7 @@ module.exports = {
                 });
             }
 
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
             const lyricsData = player.currentLyrics;
             const pages = LyricsManager.formatFullLyrics(lyricsData, 4000);
@@ -1123,7 +1123,7 @@ module.exports = {
             if (interaction.deferred) {
                 await interaction.editReply({ content: errorMsg });
             } else {
-                await interaction.reply({ content: errorMsg, ephemeral: true });
+                await interaction.reply({ content: errorMsg, flags: MessageFlags.Ephemeral });
             }
         }
     }

@@ -1,4 +1,4 @@
-const { Events, EmbedBuilder } = require('discord.js');
+const { Events, EmbedBuilder, MessageFlags} = require('discord.js');
 const config = require('../config');
 const LanguageManager = require('../src/LanguageManager');
 
@@ -29,7 +29,7 @@ module.exports = {
                 default:
                     await interaction.reply({
                         content: await LanguageManager.getTranslation(guild?.id, 'modalhandler.unknown_modal'),
-                        ephemeral: true
+                        flags: MessageFlags.Ephemeral
                     });
             }
         } catch (error) {
@@ -37,7 +37,7 @@ module.exports = {
                 try {
                     await interaction.reply({
                         content: await LanguageManager.getTranslation(guild?.id, 'modalhandler.processing_error'),
-                        ephemeral: true
+                        flags: MessageFlags.Ephemeral
                     });
                 } catch (replyError) {
                 }
@@ -111,7 +111,7 @@ module.exports = {
         if (!member.voice.channel) {
             return await interaction.reply({
                 content: await LanguageManager.getTranslation(guild?.id, 'modalhandler.voice_channel_required'),
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -120,7 +120,7 @@ module.exports = {
         if (!player) {
             return await interaction.reply({
                 content: await LanguageManager.getTranslation(guild?.id, 'modalhandler.no_music_playing'),
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -128,7 +128,7 @@ module.exports = {
         if (player.voiceChannel.id !== member.voice.channel.id) {
             return await interaction.reply({
                 content: await LanguageManager.getTranslation(guild?.id, 'modalhandler.same_channel_required'),
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -139,7 +139,7 @@ module.exports = {
         if (isNaN(volume) || volume < 0 || volume > 100) {
             return await interaction.reply({
                 content: await LanguageManager.getTranslation(guild?.id, 'modalhandler.invalid_volume'),
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -166,11 +166,11 @@ module.exports = {
                 inline: false
             });
 
-            await interaction.reply({ embeds: [embed], ephemeral: true });
+            await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
         } else {
             await interaction.reply({
                 content: await LanguageManager.getTranslation(guild?.id, 'modalhandler.volume_error'),
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
     },
