@@ -133,6 +133,83 @@ class MusicPlayer {
         this.setupEvents();
     }
 
+    cleanVoiceStatusText(value) {
+        return String(value || '')
+            .replace(/\u00a0/g, ' ')
+            .replace(/\s*,\s*/g, ', ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    async updateVoiceChannelStatus(track = this.currentTrack) {
+        try {
+            if (process.env.VOICE_STATUS_ENABLED === 'false') return;
+            if (!this.voiceChannel?.id || !track) return;
+
+            const token = process.env.DISCORD_TOKEN;
+            if (!token) return;
+
+            const emoji = process.env.VOICE_STATUS_EMOJI || '<a:mcrkilljoys:1516189800623898835>';
+            const title = this.cleanVoiceStatusText(track.title || 'Unknown Title');
+            const artist = this.cleanVoiceStatusText(track.artist || track.uploader || track.author || '');
+
+            let status = artist ? `${emoji} ${title} - ${artist}` : `${emoji} ${title}`;
+            status = status.slice(0, 500);
+
+            if (this.lastVoiceChannelStatus === status) return;
+
+            const response = await fetch(`https://discord.com/api/v10/channels/${this.voiceChannel.id}/voice-status`, {
+                method: 'PUT',
+                headers: {
+                    Authorization: `Bot ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ status })
+            });
+
+            if (!response.ok && response.status !== 204) {
+                const body = await response.text().catch(() => '');
+                console.error(`⚠️ Failed to update voice channel status: ${response.status} ${response.statusText} ${body}`);
+                return;
+            }
+
+            this.lastVoiceChannelStatus = status;
+            console.log(`📻 Voice channel status updated: ${status}`);
+        } catch (error) {
+            console.error('⚠️ Failed to update voice channel status:', error.message || error);
+        }
+    }
+
+    async clearVoiceChannelStatus() {
+        try {
+            if (process.env.VOICE_STATUS_ENABLED === 'false') return;
+            if (!this.voiceChannel?.id) return;
+
+            const token = process.env.DISCORD_TOKEN;
+            if (!token) return;
+
+            const response = await fetch(`https://discord.com/api/v10/channels/${this.voiceChannel.id}/voice-status`, {
+                method: 'PUT',
+                headers: {
+                    Authorization: `Bot ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ status: null })
+            });
+
+            if (!response.ok && response.status !== 204) {
+                const body = await response.text().catch(() => '');
+                console.error(`⚠️ Failed to clear voice channel status: ${response.status} ${response.statusText} ${body}`);
+                return;
+            }
+
+            this.lastVoiceChannelStatus = null;
+            console.log('📻 Voice channel status cleared');
+        } catch (error) {
+            console.error('⚠️ Failed to clear voice channel status:', error.message || error);
+        }
+    }
+
     setupEvents() {
         // Audio player events
         this.audioPlayer.on(AudioPlayerStatus.Playing, () => {
@@ -1024,6 +1101,7 @@ class MusicPlayer {
             }
 
             console.log(`▶️  Playing: ${this.currentTrack.title} (${this.currentTrack.duration}s, offset: ${resumeFromMs}ms)`);
+            await this.updateVoiceChannelStatus(this.currentTrack);
 
             // Play the resource
             this.audioPlayer.play(this.resource);
@@ -1324,6 +1402,7 @@ class MusicPlayer {
         this.paused = false;
 
         this.stopStateSync();
+        this.clearVoiceChannelStatus().catch(() => {});
         if (this.guild?.id) {
             PlayerStateManager.removeState(this.guild.id).catch(() => {});
         }
